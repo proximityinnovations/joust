@@ -1,0 +1,10 @@
+hash: b636ab47c0606a08fb0dd5811299832d85fa7d84b3c4785c954b55672bf82fd1
+updated: 2016-06-19T13:59:21.239445887-05:00
+imports:
+- name: github.com/dgrijalva/jwt-go
+  version: f0777076321ab64f6efc15a82d9d23b98539b943
+- name: golang.org/x/net
+  version: 1961d9def2b2d7a28d7958926d2457d05a178ecd
+  subpackages:
+  - context
+devImports: []

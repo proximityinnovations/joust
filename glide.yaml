@@ -1,0 +1,6 @@
+package: github.com/bmartel/joust
+import:
+- package: github.com/dgrijalva/jwt-go
+- package: golang.org/x/net
+  subpackages:
+  - context
