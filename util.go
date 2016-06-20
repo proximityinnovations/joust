@@ -2,7 +2,6 @@ package joust
 
 import (
 	"crypto/md5"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
@@ -10,6 +9,10 @@ import (
 	"time"
 )
 
+const (
+	md5Hash = iota
+	sha256Hash
+)
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const (
 	letterIdxBits = 6                    // 6 bits to represent a letter index
@@ -21,20 +24,23 @@ func getDomain(r *http.Request) string {
 	return fmt.Sprintf("%s://%s", r.URL.Scheme, r.URL.Host)
 }
 
-// MD5 generates the md5 hash of provided string
-func MD5(text string) string {
-	v := md5.Sum([]byte(text))
-	return hex.EncodeToString(v[:])
+func hash(hType int, text string) string {
+	var val [16]byte
+
+	switch hType {
+	case md5Hash:
+		val = md5.Sum([]byte(text))
+	case sha256Hash:
+		val = md5.Sum([]byte(text))
+	default:
+		return ""
+	}
+
+	return hex.EncodeToString(val[:])
 }
 
-// SHA256 generates the sha256 hash of provided string
-func SHA256(text string) string {
-	v := sha256.New().Sum([]byte(text))
-	return hex.EncodeToString(v[:])
-}
-
-// RandomStr generates a randomized string of a fixed length
-func RandomStr(n int) string {
+// randomStr generates a randomized string of a fixed length
+func randomStr(n int) string {
 	src := rand.NewSource(time.Now().UnixNano())
 	b := make([]byte, n)
 	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
