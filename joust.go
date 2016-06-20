@@ -1,6 +1,7 @@
 package joust
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/garyburd/redigo/redis"
 )
 
 const authParam = "auth_token"
@@ -124,23 +124,6 @@ func New(options *Options) *Joust {
 	return &Joust{&Middleware{options}, options}
 }
 
-// DefaultRedis returns a pointer to a new middleware configuration based on default
-// Options for a redis backed instance
-func DefaultRedis(secretKey []byte, domain string, secure bool, connPool *redis.Pool, debug bool) *Joust {
-	options := defaultOptions()
-	options.Debug = debug
-	options.SigningKey = secretKey
-	options.Domain = domain
-	options.Secure = secure
-	options.Storer = NewRedisStore(connPool)
-	options.ValidationKeyGetter = jwtKeyGetter(secretKey)
-
-	return &Joust{
-		&Middleware{options},
-		options,
-	}
-}
-
 // Joust provides middleware and token management using jwt
 type Joust struct {
 	Middleware *Middleware
@@ -166,9 +149,6 @@ func (j *Joust) GenerateToken(r *http.Request, user Identifier, forever bool) *j
 	claims.Id = user.Identity()
 
 	url := getDomain(r)
-	if j.Options.Audience == "" {
-		claims.Audience = url
-	}
 	if j.Options.Issuer == "" {
 		claims.Issuer = url
 	}
@@ -198,7 +178,7 @@ func (m *Middleware) StoreCookie(w http.ResponseWriter, token *jwt.Token) {
 	tokenString, _ := token.SignedString(m.Options.SigningKey)
 	cookie := &http.Cookie{
 		Name:    m.Options.TokenIdentifier,
-		Value:   tokenString,
+		Value:   base64.URLEncoding.EncodeToString([]byte(tokenString)),
 		Path:    m.Options.Path,
 		Domain:  m.Options.Domain,
 		Expires: time.Now().Add(time.Duration(defaultCookieExpire) * time.Minute),
@@ -230,7 +210,6 @@ func (m *Middleware) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt
 	// Use the specified token extractor to extract a token from the request
 	token, err := m.Options.Extractor(r)
 
-	// If debugging is turned on, log the outcome
 	if err != nil {
 		m.logf("Error extracting JWT: %v", err)
 	} else {
@@ -250,8 +229,16 @@ func (m *Middleware) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt
 		return nil, fmt.Errorf(errorMsg)
 	}
 
+	// Decode the token
+	decodedToken, err := base64.URLEncoding.DecodeString(token)
+	// If an error occurs, call the error handler and return an error
+	if err != nil {
+		m.Options.ErrorHandler(w, r, err.Error())
+		return nil, fmt.Errorf("Error extracting token: %v", err)
+	}
+
 	// Now parse the token
-	parsedToken, err := jwt.Parse(token, m.Options.ValidationKeyGetter)
+	parsedToken, err := jwt.Parse(string(decodedToken), m.Options.ValidationKeyGetter)
 
 	// Check if there was an error in parsing...
 	if err != nil {
@@ -283,7 +270,7 @@ func (m *Middleware) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt
 		// Delete the invalid token cookie
 		m.DeleteCookie(w)
 
-		m.logf("Token is invalid")
+		m.logf("Token is invalid, removing token with jti %s", claims.Id)
 		m.Options.ErrorHandler(w, r, "The token isn't valid")
 		return nil, fmt.Errorf("Token is invalid")
 	}
