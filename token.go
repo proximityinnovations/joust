@@ -1,4 +1,6 @@
 package joust
 
-// Claims is a list of values for a jwt
-type Claims map[string]string
+// Identifier allows for a unqiue identity to be provided
+type Identifier interface {
+	Identity() string
+}
