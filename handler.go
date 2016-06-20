@@ -18,6 +18,17 @@ func (j *Joust) Handler(h http.Handler) http.Handler {
 	})
 }
 
-// func (j *Joust) GinHandler(c *gin.Context) {
+// // GinHandler is a middleware implementation for the gin library
+// func GinHandler(j *Joust) gin.HandlerFunc {
+// 	return func(c *gin.Context) {
+// 		// Validate an available token for the request
+// 		token, err := j.ValidateToken(c.Writer, c.Request)
+// 		// If there was an error, do not continue.
+// 		if err != nil {
+// 			return
+// 		}
 //
+// 		// Set the id of the user
+// 		c.Set(j.Options.IdentityProperty, token.Claims.(jwt.StandardClaims).Id)
+// 	}
 // }
