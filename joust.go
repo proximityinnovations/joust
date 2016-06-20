@@ -295,14 +295,3 @@ func jwtKeyGetter(signingKey []byte) jwt.Keyfunc {
 		return signingKey, nil
 	}
 }
-
-func defaultOptions() *Options {
-	return &Options{
-		IdentityProperty: identityProperty,
-		TokenIdentifier:  authParam,
-		ErrorHandler:     onError,
-		Extractor:        FirstOf(FromHeader, FromParameter(authParam), FromCookie(authParam)),
-		SigningMethod:    jwt.SigningMethodHS256,
-		TTL:              defaultTTL,
-	}
-}
