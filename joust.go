@@ -122,13 +122,12 @@ func New(options *Options) *Joust {
 
 	options.HttpOnly = true
 
-	return &Joust{&Middleware{options}, options}
+	return &Joust{options}
 }
 
 // Joust provides middleware and token management using jwt
 type Joust struct {
-	Middleware *Middleware
-	Options    *Options
+	Options *Options
 }
 
 // RefreshToken will remove an old token and generate a new one
@@ -169,19 +168,14 @@ func (j *Joust) GenerateToken(r *http.Request, user Identifier, forever bool) *j
 	return jwtToken
 }
 
-// Middleware is a jwt handling middleware
-type Middleware struct {
-	Options *Options
-}
-
 // StoreCookie will store the token in a cookie
-func (m *Middleware) StoreCookie(w http.ResponseWriter, token *jwt.Token) {
-	tokenString, _ := token.SignedString(m.Options.SigningKey)
+func (j *Joust) StoreCookie(w http.ResponseWriter, token *jwt.Token) {
+	tokenString, _ := token.SignedString(j.Options.SigningKey)
 	cookie := &http.Cookie{
-		Name:    m.Options.TokenIdentifier,
+		Name:    j.Options.TokenIdentifier,
 		Value:   base64.URLEncoding.EncodeToString([]byte(tokenString)),
-		Path:    m.Options.Path,
-		Domain:  m.Options.Domain,
+		Path:    j.Options.Path,
+		Domain:  j.Options.Domain,
 		Expires: time.Now().Add(time.Duration(defaultCookieExpire) * time.Minute),
 	}
 
@@ -189,44 +183,44 @@ func (m *Middleware) StoreCookie(w http.ResponseWriter, token *jwt.Token) {
 }
 
 // DeleteCookie will delete the cookie holding the token
-func (m *Middleware) DeleteCookie(w http.ResponseWriter) {
+func (j *Joust) DeleteCookie(w http.ResponseWriter) {
 	cookie := &http.Cookie{
-		Name:   m.Options.TokenIdentifier,
+		Name:   j.Options.TokenIdentifier,
 		MaxAge: -1,
-		Path:   m.Options.Path,
-		Domain: m.Options.Domain,
+		Path:   j.Options.Path,
+		Domain: j.Options.Domain,
 	}
 
 	http.SetCookie(w, cookie)
 }
 
 // ValidateToken parses and handles token validation for a given request
-func (m *Middleware) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Token, error) {
-	if !m.Options.EnableAuthOnOptions {
+func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Token, error) {
+	if !j.Options.EnableAuthOnOptions {
 		if r.Method == "OPTIONS" {
 			return nil, nil
 		}
 	}
 
 	// Use the specified token extractor to extract a token from the request
-	token, err := m.Options.Extractor(r)
+	token, err := j.Options.Extractor(r)
 
 	if err != nil {
-		m.logf("Error extracting JWT: %v", err)
+		j.logf("Error extracting JWT: %v", err)
 	} else {
-		m.logf("Token extracted: %s", token)
+		j.logf("Token extracted: %s", token)
 	}
 
 	// If an error occurs, call the error handler and return an error
 	if err != nil {
-		m.Options.ErrorHandler(w, r, err.Error())
+		j.Options.ErrorHandler(w, r, err.Error())
 		return nil, fmt.Errorf("Error extracting token: %v", err)
 	}
 
 	// If the token is empty...
 	if token == "" {
 		errorMsg := "Required authorization token not found"
-		m.Options.ErrorHandler(w, r, errorMsg)
+		j.Options.ErrorHandler(w, r, errorMsg)
 		return nil, fmt.Errorf(errorMsg)
 	}
 
@@ -234,28 +228,28 @@ func (m *Middleware) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt
 	decodedToken, err := base64.URLEncoding.DecodeString(token)
 	// If an error occurs, call the error handler and return an error
 	if err != nil {
-		m.Options.ErrorHandler(w, r, err.Error())
+		j.Options.ErrorHandler(w, r, err.Error())
 		return nil, fmt.Errorf("Error extracting token: %v", err)
 	}
 
 	// Now parse the token
-	parsedToken, err := jwt.Parse(string(decodedToken), m.Options.ValidationKeyGetter)
+	parsedToken, err := jwt.Parse(string(decodedToken), j.Options.ValidationKeyGetter)
 
 	// Check if there was an error in parsing...
 	if err != nil {
-		m.logf("Error parsing token: %v", err)
-		m.Options.ErrorHandler(w, r, err.Error())
+		j.logf("Error parsing token: %v", err)
+		j.Options.ErrorHandler(w, r, err.Error())
 		return nil, fmt.Errorf("Error parsing token: %v", err)
 	}
 
-	if m.Options.SigningMethod != nil && m.Options.SigningMethod.Alg() != parsedToken.Header["alg"] {
+	if j.Options.SigningMethod != nil && j.Options.SigningMethod.Alg() != parsedToken.Header["alg"] {
 		message := fmt.Sprintf(
 			"Expected %s signing method but token specified %s",
-			m.Options.SigningMethod.Alg(),
+			j.Options.SigningMethod.Alg(),
 			parsedToken.Header["alg"],
 		)
-		m.logf("Error validating token algorithm: %s", message)
-		m.Options.ErrorHandler(w, r, errors.New(message).Error())
+		j.logf("Error validating token algorithm: %s", message)
+		j.Options.ErrorHandler(w, r, errors.New(message).Error())
 		return nil, fmt.Errorf("Error validating token algorithm: %s", message)
 	}
 
@@ -263,26 +257,26 @@ func (m *Middleware) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt
 	tokenVal := *parsedToken
 
 	// Check if the parsed token is valid...
-	if !parsedToken.Valid || !m.Options.Storer.Exists(claims.Id, tokenVal) {
+	if !parsedToken.Valid || !j.Options.Storer.Exists(claims.Id, tokenVal) {
 
 		// Remove invalid tokens from storage
-		go m.Options.Storer.Remove(claims.Id, tokenVal)
+		go j.Options.Storer.Remove(claims.Id, tokenVal)
 
 		// Delete the invalid token cookie
-		m.DeleteCookie(w)
+		j.DeleteCookie(w)
 
-		m.logf("Token is invalid, removing token with jti %s", claims.Id)
-		m.Options.ErrorHandler(w, r, "The token isn't valid")
+		j.logf("Token is invalid, removing token with jti %s", claims.Id)
+		j.Options.ErrorHandler(w, r, "The token isn't valid")
 		return nil, fmt.Errorf("Token is invalid")
 	}
 
-	m.logf("JWT: %v", parsedToken)
+	j.logf("JWT: %v", parsedToken)
 
 	return parsedToken, nil
 }
 
-func (m *Middleware) logf(format string, args ...interface{}) {
-	if m.Options.Debug {
+func (j *Joust) logf(format string, args ...interface{}) {
+	if j.Options.Debug {
 		log.Printf(format, args...)
 	}
 }
