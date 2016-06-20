@@ -271,12 +271,14 @@ func (m *Middleware) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt
 		return nil, fmt.Errorf("Error validating token algorithm: %s", message)
 	}
 
+	claims := parsedToken.Claims.(jwt.StandardClaims)
+	tokenVal := *parsedToken
+
 	// Check if the parsed token is valid...
-	if !parsedToken.Valid {
-		claims := parsedToken.Claims.(jwt.StandardClaims)
+	if !parsedToken.Valid || !m.Options.Storer.Exists(claims.Id, tokenVal) {
 
 		// Remove invalid tokens from storage
-		go m.Options.Storer.Remove(claims.Id, *parsedToken)
+		go m.Options.Storer.Remove(claims.Id, tokenVal)
 
 		// Delete the invalid token cookie
 		m.DeleteCookie(w)
