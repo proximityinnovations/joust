@@ -1,10 +1,10 @@
-hash: b636ab47c0606a08fb0dd5811299832d85fa7d84b3c4785c954b55672bf82fd1
-updated: 2016-06-19T13:59:21.239445887-05:00
+hash: 042a3d9398b995906ecc11b1bb7ce13bacd89361cbe0789774eb3d1364177836
+updated: 2016-06-19T19:26:00.474516652-05:00
 imports:
 - name: github.com/dgrijalva/jwt-go
   version: f0777076321ab64f6efc15a82d9d23b98539b943
-- name: golang.org/x/net
-  version: 1961d9def2b2d7a28d7958926d2457d05a178ecd
+- name: github.com/garyburd/redigo
+  version: b8dc90050f24c1a73a52f107f3f575be67b21b7c
   subpackages:
-  - context
+  - redis
 devImports: []

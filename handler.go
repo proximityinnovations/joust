@@ -2,6 +2,7 @@ package joust
 
 import "net/http"
 
+// Handler is a standard implementation of the middleware
 func (m *Middleware) Handler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 

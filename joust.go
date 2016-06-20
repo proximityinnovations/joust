@@ -5,15 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 )
 
 type errorHandler func(w http.ResponseWriter, r *http.Request, err string)
-
-// TokenExtractor handles retrieving a jwt from the incoming request
-type TokenExtractor func(r *http.Request) (string, error)
 
 // Options is a struct for specifying configuration options for the middleware.
 type Options struct {
@@ -34,6 +30,9 @@ type Options struct {
 	// A function that extracts the token from the request
 	// Default: FromAuthHeader (i.e., from Authorization header as bearer token)
 	Extractor TokenExtractor
+	// An implementation of the TokenStorer interface that manages tokens on the server
+	// Default: TODO
+	Storer TokenStorer
 	// Debug flag turns on debugging output
 	// Default: false
 	Debug bool
@@ -57,63 +56,29 @@ func onError(w http.ResponseWriter, r *http.Request, err string) {
 	http.Error(w, err, http.StatusUnauthorized)
 }
 
+// New returns a pointer to a new middleware configuration based on the provided
+// Options
 func New(options Options) *Middleware {
 	return &Middleware{options}
 }
 
+// Default returns a pointer to a new middleware configuration based on default
+// Options
 func Default() *Middleware {
 	return &Middleware{Options{
 		IdentityProperty: "user",
 		ErrorHandler:     onError,
-		Extractor:        FromAuthHeader,
+		Extractor:        FromHeader,
 		SigningMethod:    jwt.SigningMethodHS256,
 	}}
 }
 
+// Middleware is a jwt handling middleware
 type Middleware struct {
 	Options Options
 }
 
-// FromAuthHeader is a "TokenExtractor" that takes a give request and extracts
-// the JWT token from the Authorization header.
-func FromAuthHeader(r *http.Request) (string, error) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return "", nil // No error, just no token
-	}
-
-	if len(authHeader) > 6 && strings.ToUpper(authHeader[0:6]) != "BEARER" {
-		return "", fmt.Errorf("Authorization header format must be Bearer {token}")
-	}
-
-	return authHeader[7:], nil
-}
-
-// FromParameter returns a function that extracts the token from the specified
-// query string parameter
-func FromParameter(param string) TokenExtractor {
-	return func(r *http.Request) (string, error) {
-		return r.URL.Query().Get(param), nil
-	}
-}
-
-// FirstOf returns a function that runs multiple token extractors and takes the
-// first token it finds
-func FirstOf(extractors ...TokenExtractor) TokenExtractor {
-	return func(r *http.Request) (string, error) {
-		for _, ex := range extractors {
-			token, err := ex(r)
-			if err != nil {
-				return "", err
-			}
-			if token != "" {
-				return token, nil
-			}
-		}
-		return "", nil
-	}
-}
-
+// ValidateToken parses and handles token validation for a given request
 func (m *Middleware) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Token, error) {
 	if !m.Options.EnableAuthOnOptions {
 		if r.Method == "OPTIONS" {
@@ -167,6 +132,8 @@ func (m *Middleware) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt
 
 	// Check if the parsed token is valid...
 	if !parsedToken.Valid {
+		// Remove invalid tokens from storage
+
 		m.logf("Token is invalid")
 		m.Options.ErrorHandler(w, r, "The token isn't valid")
 		return nil, fmt.Errorf("Token is invalid")

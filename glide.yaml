@@ -1,6 +1,6 @@
 package: github.com/bmartel/joust
 import:
 - package: github.com/dgrijalva/jwt-go
-- package: golang.org/x/net
+- package: github.com/garyburd/redigo
   subpackages:
-  - context
+  - redis
