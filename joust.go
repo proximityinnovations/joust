@@ -27,7 +27,11 @@ type ErrorHandler func(w http.ResponseWriter, r *http.Request, err string)
 
 // Options is a struct for specifying configuration options for the middleware.
 type Options struct {
+	// An implementation of the TokenStorer interface that manages tokens on the server
+	// *Required
+	Storer TokenStorer
 	// Key used for encryption and hash generation
+	// *Required
 	SigningKey []byte
 	// The function that will return the Key to validate the JWT.
 	// It can be either a shared secret or a public key.
@@ -43,9 +47,6 @@ type Options struct {
 	// A function that extracts the token from the request
 	// Default: FromAuthHeader
 	Extractor TokenExtractor
-	// An implementation of the TokenStorer interface that manages tokens on the server
-	// Default: nil
-	Storer TokenStorer
 	// Debug flag turns on debugging output
 	// Default: false
 	Debug bool
