@@ -1,16 +1,13 @@
 package joust
 
-import (
-	"github.com/dgrijalva/jwt-go"
-	"github.com/garyburd/redigo/redis"
-)
+import "github.com/garyburd/redigo/redis"
 
 // TokenStorer defines the necessary storage methods for managing tokens on the server
 type TokenStorer interface {
-	Add(string, jwt.Token) error
-	Remove(string, jwt.Token) error
+	Add(string, string) error
+	Remove(string, string) error
 	RemoveAll(string) error
-	Exists(string, jwt.Token) bool
+	Exists(string, string) bool
 	Flush() error
 }
 
@@ -25,7 +22,7 @@ type RedisStore struct {
 }
 
 // Add a token to the user record in redis
-func (store *RedisStore) Add(key string, token jwt.Token) error {
+func (store *RedisStore) Add(key string, token string) error {
 	conn := store.conn.Get()
 	defer conn.Close()
 
@@ -35,7 +32,7 @@ func (store *RedisStore) Add(key string, token jwt.Token) error {
 }
 
 // Remove a token from the user record in redis
-func (store *RedisStore) Remove(key string, token jwt.Token) error {
+func (store *RedisStore) Remove(key string, token string) error {
 	conn := store.conn.Get()
 	defer conn.Close()
 
@@ -55,7 +52,7 @@ func (store *RedisStore) RemoveAll(key string) error {
 }
 
 // Exists checks for the occurrence of the target token in the user record
-func (store *RedisStore) Exists(key string, token jwt.Token) bool {
+func (store *RedisStore) Exists(key string, token string) bool {
 	conn := store.conn.Get()
 	defer conn.Close()
 

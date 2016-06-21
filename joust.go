@@ -7,8 +7,6 @@ import (
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/dgrijalva/jwt-go"
 )
 
 const authParam = "auth_token"
@@ -42,7 +40,7 @@ type Options struct {
 	// Default: "user"
 	IdentityProperty string
 	// The function that will be called when there's an error validating the token
-	// Default: OnError
+	// Default: onError
 	ErrorHandler ErrorHandler
 	// A function that extracts the token from the request
 	// Default: FromAuthHeader
@@ -62,19 +60,21 @@ type Options struct {
 	// Default: defaultTTL
 	TTL int32
 	// Valid target audience for the generated tokens
+	// Default: ""
 	Audience string
 	// Issuer of the token
+	// Default: origin server host
 	Issuer string
 	// Storage identifier for jwt in cookie and query params
+	// Default: authParam
 	TokenIdentifier string
-	// Cookie options
 	// Default: "/"
 	Path string
-	// Default: false
-	Secure bool
 	// Default: ""
 	Domain string
-	// Default: true
+	// Default: false
+	Secure bool
+	// Default: false
 	HttpOnly bool
 }
 
@@ -130,13 +130,19 @@ type Joust struct {
 	Options *Options
 }
 
+// Save a user identity to stored token and return encoded token
+func (j *Joust) Save(w http.ResponseWriter, r *http.Request, user Identifier, forever bool) string {
+	return j.StoreToken(w, j.GenerateToken(r, user, forever))
+}
+
 // RefreshToken will remove an old token and generate a new one
-func (j *Joust) RefreshToken(r *http.Request, currentToken *jwt.Token, user Identifier, forever bool) *jwt.Token {
-	j.Options.Storer.Remove(user.Identity(), *currentToken)
+func (j *Joust) RefreshToken(r *http.Request, currentToken string, user Identifier, forever bool) *jwt.Token {
+	newToken := j.EncodeToken(j.GenerateToken(r, user, forever))
 
-	newToken := j.GenerateToken(r, user, forever)
-
-	j.Options.Storer.Add(user.Identity(), *newToken)
+	go func() {
+		j.Options.Storer.Remove(user.Identity(), currentToken)
+		j.Options.Storer.Add(user.Identity(), newToken)
+	}()
 
 	return newToken
 }
@@ -168,22 +174,46 @@ func (j *Joust) GenerateToken(r *http.Request, user Identifier, forever bool) *j
 	return jwtToken
 }
 
-// StoreCookie will store the token in a cookie
-func (j *Joust) StoreCookie(w http.ResponseWriter, token *jwt.Token) {
+// EncodeToken will return a base64 encoded string representation of the token
+func (j *Joust) EncodeToken(token *jwt.Token) string {
 	tokenString, _ := token.SignedString(j.Options.SigningKey)
+	return base64.URLEncoding.EncodeToString([]byte(tokenString))
+}
+
+// DecodeToken will take a base64 encoded string and try to parse a jwt from it
+func (j *Joust) DecodeToken(token string) (*jwt.Token, error) {
+	decodedToken, err := base64.URLEncoding.DecodeString(token)
+	if err != nil {
+		return nil, err
+	}
+
+	return jwt.Parse(string(decodedToken), j.Options.ValidationKeyGetter)
+}
+
+// StoreToken will store the token in a cookie and return the signed token string
+func (j *Joust) StoreToken(w http.ResponseWriter, token *jwt.Token) string {
+	tokenEncoded := j.EncodeToken(token)
+
 	cookie := &http.Cookie{
 		Name:    j.Options.TokenIdentifier,
-		Value:   base64.URLEncoding.EncodeToString([]byte(tokenString)),
+		Value:   tokenEncoded,
 		Path:    j.Options.Path,
 		Domain:  j.Options.Domain,
 		Expires: time.Now().Add(time.Duration(defaultCookieExpire) * time.Minute),
 	}
 
 	http.SetCookie(w, cookie)
+
+	go func() {
+		claims := token.Claims.(jwt.StandardClaims)
+		j.Options.Storer.Add(claims.Id, tokenEncoded)
+	}()
+
+	return tokenEncoded
 }
 
-// DeleteCookie will delete the cookie holding the token
-func (j *Joust) DeleteCookie(w http.ResponseWriter) {
+// DeleteToken will delete the cookie holding the token
+func (j *Joust) DeleteToken(w http.ResponseWriter, token *jwt.Token) {
 	cookie := &http.Cookie{
 		Name:   j.Options.TokenIdentifier,
 		MaxAge: -1,
@@ -192,6 +222,12 @@ func (j *Joust) DeleteCookie(w http.ResponseWriter) {
 	}
 
 	http.SetCookie(w, cookie)
+
+	// Remove invalid tokens from storage
+	go func() {
+		claims := token.Claims.(jwt.StandardClaims)
+		j.Options.Storer.Remove(claims.Id, j.EncodeToken(token))
+	}()
 }
 
 // ValidateToken parses and handles token validation for a given request
@@ -224,16 +260,13 @@ func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Toke
 		return nil, fmt.Errorf(errorMsg)
 	}
 
-	// Decode the token
-	decodedToken, err := base64.URLEncoding.DecodeString(token)
+	// Decode and parse the token
+	parsedToken, err := j.DecodeToken(token)
 	// If an error occurs, call the error handler and return an error
 	if err != nil {
 		j.Options.ErrorHandler(w, r, err.Error())
 		return nil, fmt.Errorf("Error extracting token: %v", err)
 	}
-
-	// Now parse the token
-	parsedToken, err := jwt.Parse(string(decodedToken), j.Options.ValidationKeyGetter)
 
 	// Check if there was an error in parsing...
 	if err != nil {
@@ -254,16 +287,11 @@ func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Toke
 	}
 
 	claims := parsedToken.Claims.(jwt.StandardClaims)
-	tokenVal := *parsedToken
 
 	// Check if the parsed token is valid...
-	if !parsedToken.Valid || !j.Options.Storer.Exists(claims.Id, tokenVal) {
-
-		// Remove invalid tokens from storage
-		go j.Options.Storer.Remove(claims.Id, tokenVal)
-
-		// Delete the invalid token cookie
-		j.DeleteCookie(w)
+	if !parsedToken.Valid || !j.Options.Storer.Exists(claims.Id, token) {
+		// Delete the invalid token
+		j.DeleteToken(w, parsedToken)
 
 		j.logf("Token is invalid, removing token with jti %s", claims.Id)
 		j.Options.ErrorHandler(w, r, "The token isn't valid")

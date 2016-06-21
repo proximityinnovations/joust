@@ -32,3 +32,12 @@ func (j *Joust) Handler(h http.Handler) http.Handler {
 // 		c.Set(j.Options.IdentityProperty, token.Claims.(jwt.StandardClaims).Id)
 // 	}
 // }
+//
+// func RequireUser(j *Joust) gin.HandlerFunc {
+// 	return func(c *gin.Context) {
+// 		_, exists := c.Get(j.Options.IdentityProperty)
+// 		if !exists {
+// 			c.AbortWithStatus(http.StatusUnauthorized)
+// 		}
+// 	}
+// }
