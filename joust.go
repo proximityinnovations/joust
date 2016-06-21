@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 const authParam = "auth_token"
@@ -133,18 +135,6 @@ type Joust struct {
 // Save a user identity to stored token and return encoded token
 func (j *Joust) Save(w http.ResponseWriter, r *http.Request, user Identifier, forever bool) string {
 	return j.StoreToken(w, j.GenerateToken(r, user, forever))
-}
-
-// RefreshToken will remove an old token and generate a new one
-func (j *Joust) RefreshToken(r *http.Request, currentToken string, user Identifier, forever bool) *jwt.Token {
-	newToken := j.EncodeToken(j.GenerateToken(r, user, forever))
-
-	go func() {
-		j.Options.Storer.Remove(user.Identity(), currentToken)
-		j.Options.Storer.Add(user.Identity(), newToken)
-	}()
-
-	return newToken
 }
 
 // GenerateToken will create a token for the given request user

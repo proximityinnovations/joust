@@ -1,6 +1,9 @@
-package: github.com/bmartel/joust
+package: github.com/proximityinnovations/joust
 import:
 - package: github.com/dgrijalva/jwt-go
 - package: github.com/garyburd/redigo
   subpackages:
   - redis
+- package: golang.org/x/crypto
+  subpackages:
+  - bcrypt

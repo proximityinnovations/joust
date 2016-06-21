@@ -1,5 +1,5 @@
-hash: 042a3d9398b995906ecc11b1bb7ce13bacd89361cbe0789774eb3d1364177836
-updated: 2016-06-20T08:55:24.27800245-05:00
+hash: cffa596e58d4a3630bb4de8e3bf3859de61cf275c909afd2fb8b470ad5920580
+updated: 2016-06-21T09:24:12.840069793-05:00
 imports:
 - name: github.com/dgrijalva/jwt-go
   version: f0777076321ab64f6efc15a82d9d23b98539b943
@@ -8,4 +8,8 @@ imports:
   subpackages:
   - redis
   - internal
+- name: golang.org/x/crypto
+  version: f3241ce8505855877cc8a9717bd61a0f7c4ea83c
+  subpackages:
+  - bcrypt
 devImports: []

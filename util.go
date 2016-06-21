@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"regexp"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -56,12 +58,12 @@ func Secure(password string, n int) (string, error) {
 		return "", err
 	}
 
-	return hashedPassword, nil
+	return string(hashedPassword), nil
 }
 
 // Check a hashed password against a password string to see if they are a match
 func Check(localPass string, hashedPass string) error {
-	err = bcrypt.CompareHashAndPassword([]byte(hashedPass), []byte(localPass))
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPass), []byte(localPass))
 	if err != nil {
 		return fmt.Errorf("passwords do not match")
 	}
