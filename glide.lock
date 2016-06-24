@@ -1,15 +1,16 @@
 hash: cffa596e58d4a3630bb4de8e3bf3859de61cf275c909afd2fb8b470ad5920580
-updated: 2016-06-21T09:24:12.840069793-05:00
+updated: 2016-06-24T08:29:01.348595285-05:00
 imports:
 - name: github.com/dgrijalva/jwt-go
-  version: f0777076321ab64f6efc15a82d9d23b98539b943
+  version: d2709f9f1f31ebcda9651b03077758c1f3a0018c
 - name: github.com/garyburd/redigo
   version: b8dc90050f24c1a73a52f107f3f575be67b21b7c
   subpackages:
   - redis
   - internal
 - name: golang.org/x/crypto
-  version: f3241ce8505855877cc8a9717bd61a0f7c4ea83c
+  version: 811831de4c4dd03a0b8737233af3b36852386373
   subpackages:
   - bcrypt
+  - blowfish
 devImports: []

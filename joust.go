@@ -37,6 +37,9 @@ type Options struct {
 	// It can be either a shared secret or a public key.
 	// Default value: nil
 	ValidationKeyGetter jwt.Keyfunc
+	// The claims object expected to structure a token
+	// Default value: jwt.StandardClaims
+	ClaimsType jwt.Claims
 	// The name of the property in the request where the identity information
 	// from the JWT will be stored.
 	// Default: "user"
@@ -89,6 +92,10 @@ func New(options *Options) *Joust {
 
 	if options.SigningKey == nil {
 		panic("No signing key was provided")
+	}
+
+	if options.ClaimsType == nil {
+		options.ClaimsType = &jwt.StandardClaims{}
 	}
 
 	if options.ValidationKeyGetter == nil {
@@ -176,8 +183,7 @@ func (j *Joust) DecodeToken(token string) (*jwt.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return jwt.Parse(string(decodedToken), j.Options.ValidationKeyGetter)
+	return jwt.ParseWithClaims(string(decodedToken), j.Options.ClaimsType, j.Options.ValidationKeyGetter)
 }
 
 // StoreToken will store the token in a cookie and return the signed token string
