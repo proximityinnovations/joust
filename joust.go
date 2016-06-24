@@ -196,7 +196,7 @@ func (j *Joust) StoreToken(w http.ResponseWriter, token *jwt.Token) string {
 	http.SetCookie(w, cookie)
 
 	go func() {
-		claims := token.Claims.(*jwt.StandardClaims)
+		claims := token.Claims.(jwt.StandardClaims)
 		j.Options.Storer.Add(claims.Id, tokenEncoded)
 	}()
 
