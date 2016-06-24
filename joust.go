@@ -184,11 +184,13 @@ func (j *Joust) StoreToken(w http.ResponseWriter, token *jwt.Token) string {
 	tokenEncoded := j.EncodeToken(token)
 
 	cookie := &http.Cookie{
-		Name:    j.Options.TokenIdentifier,
-		Value:   tokenEncoded,
-		Path:    j.Options.Path,
-		Domain:  j.Options.Domain,
-		Expires: time.Now().Add(time.Duration(defaultCookieExpire) * time.Minute),
+		Name:     j.Options.TokenIdentifier,
+		Value:    tokenEncoded,
+		Path:     j.Options.Path,
+		Secure:   j.Options.Secure,
+		HttpOnly: j.Options.HttpOnly,
+		Domain:   j.Options.Domain,
+		Expires:  time.Now().Add(time.Duration(defaultCookieExpire) * time.Minute),
 	}
 
 	http.SetCookie(w, cookie)
