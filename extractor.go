@@ -1,10 +1,13 @@
 package joust
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 )
+
+var ErrTokenNotFound = errors.New("no token was found from applied extractors")
 
 // TokenExtractor handles retrieving a jwt from the incoming request
 type TokenExtractor func(r *http.Request) (string, error)
@@ -37,7 +40,10 @@ func FromParameter(param string) TokenExtractor {
 func FromCookie(name string) TokenExtractor {
 	return func(r *http.Request) (string, error) {
 		cookie, err := r.Cookie(name)
-		return cookie.Value, err
+		if err != nil {
+			return "", err
+		}
+		return cookie.Value, nil
 	}
 }
 
@@ -47,13 +53,15 @@ func FirstOf(extractors ...TokenExtractor) TokenExtractor {
 	return func(r *http.Request) (string, error) {
 		for _, ex := range extractors {
 			token, err := ex(r)
+
 			if err != nil {
 				return "", err
 			}
+
 			if token != "" {
 				return token, nil
 			}
 		}
-		return "", nil
+		return "", ErrTokenNotFound
 	}
 }
