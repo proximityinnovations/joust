@@ -37,9 +37,6 @@ type Options struct {
 	// It can be either a shared secret or a public key.
 	// Default value: nil
 	ValidationKeyGetter jwt.Keyfunc
-	// The claims object expected to structure a token
-	// Default value: jwt.StandardClaims
-	ClaimsType jwt.Claims
 	// The name of the property in the request where the identity information
 	// from the JWT will be stored.
 	// Default: "user"
@@ -92,10 +89,6 @@ func New(options *Options) *Joust {
 
 	if options.SigningKey == nil {
 		panic("No signing key was provided")
-	}
-
-	if options.ClaimsType == nil {
-		options.ClaimsType = &jwt.StandardClaims{}
 	}
 
 	if options.ValidationKeyGetter == nil {
@@ -183,7 +176,7 @@ func (j *Joust) DecodeToken(token string) (*jwt.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	return jwt.ParseWithClaims(string(decodedToken), j.Options.ClaimsType, j.Options.ValidationKeyGetter)
+	return jwt.ParseWithClaims(string(decodedToken), &jwt.StandardClaims{}, j.Options.ValidationKeyGetter)
 }
 
 // StoreToken will store the token in a cookie and return the signed token string
@@ -201,7 +194,7 @@ func (j *Joust) StoreToken(w http.ResponseWriter, token *jwt.Token) string {
 	http.SetCookie(w, cookie)
 
 	go func() {
-		claims := token.Claims.(jwt.StandardClaims)
+		claims := token.Claims.(*jwt.StandardClaims)
 		j.Options.Storer.Add(claims.Id, tokenEncoded)
 	}()
 
@@ -221,7 +214,7 @@ func (j *Joust) DeleteToken(w http.ResponseWriter, token *jwt.Token) {
 
 	// Remove invalid tokens from storage
 	go func() {
-		claims := token.Claims.(jwt.StandardClaims)
+		claims := token.Claims.(*jwt.StandardClaims)
 		j.Options.Storer.Remove(claims.Id, j.EncodeToken(token))
 	}()
 }
@@ -282,7 +275,7 @@ func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Toke
 		return nil, fmt.Errorf("Error validating token algorithm: %s", message)
 	}
 
-	claims := parsedToken.Claims.(jwt.StandardClaims)
+	claims := parsedToken.Claims.(*jwt.StandardClaims)
 
 	// Check if the parsed token is valid...
 	if !parsedToken.Valid || !j.Options.Storer.Exists(claims.Id, token) {
