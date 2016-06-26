@@ -1,7 +1,6 @@
 package joust
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -11,7 +10,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
-const authParam = "auth_token"
+const authParam = "access_token"
 
 const identityProperty = "user"
 
@@ -76,7 +75,7 @@ type Options struct {
 	Domain string
 	// Default: false
 	Secure bool
-	// Default: false
+	// Default: true
 	HttpOnly bool
 }
 
@@ -141,8 +140,9 @@ func (j *Joust) Save(w http.ResponseWriter, r *http.Request, user Identifier, fo
 func (j *Joust) GenerateToken(r *http.Request, user Identifier, forever bool) *jwt.Token {
 	t := time.Now()
 
-	claims := jwt.StandardClaims{}
+	claims := StandardWithXSRFClaims{}
 	claims.Id = user.Identity()
+	claims.XSRF = RandomStr(32)
 
 	url := getDomain(r)
 	if j.Options.Issuer == "" {
@@ -167,16 +167,12 @@ func (j *Joust) GenerateToken(r *http.Request, user Identifier, forever bool) *j
 // EncodeToken will return a base64 encoded string representation of the token
 func (j *Joust) EncodeToken(token *jwt.Token) string {
 	tokenString, _ := token.SignedString(j.Options.SigningKey)
-	return base64.URLEncoding.EncodeToString([]byte(tokenString))
+	return tokenString
 }
 
 // DecodeToken will take a base64 encoded string and try to parse a jwt from it
 func (j *Joust) DecodeToken(token string) (*jwt.Token, error) {
-	decodedToken, err := base64.URLEncoding.DecodeString(token)
-	if err != nil {
-		return nil, err
-	}
-	return jwt.ParseWithClaims(string(decodedToken), &jwt.StandardClaims{}, j.Options.ValidationKeyGetter)
+	return jwt.ParseWithClaims(token, &StandardWithXSRFClaims{}, j.Options.ValidationKeyGetter)
 }
 
 // StoreToken will store the token in a cookie and return the signed token string
@@ -196,7 +192,7 @@ func (j *Joust) StoreToken(w http.ResponseWriter, token *jwt.Token) string {
 	http.SetCookie(w, cookie)
 
 	go func() {
-		claims := token.Claims.(jwt.StandardClaims)
+		claims := token.Claims.(StandardWithXSRFClaims)
 		j.Options.Storer.Add(claims.Id, tokenEncoded)
 	}()
 
@@ -216,7 +212,7 @@ func (j *Joust) DeleteToken(w http.ResponseWriter, token *jwt.Token) {
 
 	// Remove invalid tokens from storage
 	go func() {
-		claims := token.Claims.(*jwt.StandardClaims)
+		claims := token.Claims.(*StandardWithXSRFClaims)
 		j.Options.Storer.Remove(claims.Id, j.EncodeToken(token))
 	}()
 }
@@ -277,7 +273,7 @@ func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Toke
 		return nil, fmt.Errorf("Error validating token algorithm: %s", message)
 	}
 
-	claims := parsedToken.Claims.(*jwt.StandardClaims)
+	claims := parsedToken.Claims.(*StandardWithXSRFClaims)
 
 	// Check if the parsed token is valid...
 	if !parsedToken.Valid || !j.Options.Storer.Exists(claims.Id, token) {
