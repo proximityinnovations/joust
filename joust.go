@@ -132,30 +132,32 @@ type Joust struct {
 }
 
 // Save a user identity to stored token and return encoded token
-func (j *Joust) Save(w http.ResponseWriter, r *http.Request, user Identifier, forever bool) string {
-	return j.StoreToken(w, j.GenerateToken(r, user, forever))
+func (j *Joust) Save(w http.ResponseWriter, r *http.Request, claims Claims, jti Identifier, forever bool) string {
+	return j.StoreToken(w, j.GenerateToken(r, claims, jti, forever))
 }
 
 // GenerateToken will create a token for the given request user
-func (j *Joust) GenerateToken(r *http.Request, user Identifier, forever bool) *jwt.Token {
+func (j *Joust) GenerateToken(r *http.Request, claims Claims, jti Identifier, forever bool) *jwt.Token {
 	t := time.Now()
 
-	claims := StandardWithXSRFClaims{}
-	claims.Id = user.Identity()
-	claims.XSRF = RandomStr(32)
+	claims.SetIdentity(jti)
 
-	url := getDomain(r)
-	if j.Options.Issuer == "" {
-		claims.Issuer = url
+	if claims.GetSubject() == "" {
+		claims.SetSubject(j.Options.IdentityProperty + ":" + jti.Identity())
 	}
 
-	claims.IssuedAt = t.Unix()
-	claims.NotBefore = t.Unix()
+	if claims.GetIssuer() == "" || j.Options.Issuer == "" {
+		claims.SetIssuer(getDomain(r))
+	}
+
+	now := t.Unix()
+	claims.SetIssuedAt(now)
+	claims.SetNotBefore(now)
 
 	if forever {
-		claims.ExpiresAt = t.Add(ForeverTTL * time.Minute).Unix()
+		claims.SetExpiresAt(t.Add(ForeverTTL * time.Minute).Unix())
 	} else {
-		claims.ExpiresAt = t.Add(time.Duration(j.Options.TTL) * time.Minute).Unix()
+		claims.SetExpiresAt(t.Add(time.Duration(j.Options.TTL) * time.Minute).Unix())
 	}
 
 	jwtToken := jwt.New(j.Options.SigningMethod)
@@ -172,7 +174,7 @@ func (j *Joust) EncodeToken(token *jwt.Token) string {
 
 // DecodeToken will take a base64 encoded string and try to parse a jwt from it
 func (j *Joust) DecodeToken(token string) (*jwt.Token, error) {
-	return jwt.ParseWithClaims(token, &StandardWithXSRFClaims{}, j.Options.ValidationKeyGetter)
+	return jwt.ParseWithClaims(token, &StandardClaims{}, j.Options.ValidationKeyGetter)
 }
 
 // StoreToken will store the token in a cookie and return the signed token string
@@ -192,7 +194,7 @@ func (j *Joust) StoreToken(w http.ResponseWriter, token *jwt.Token) string {
 	http.SetCookie(w, cookie)
 
 	go func() {
-		claims := token.Claims.(StandardWithXSRFClaims)
+		claims := token.Claims.(StandardClaims)
 		j.Options.Storer.Add(claims.Id, tokenEncoded)
 	}()
 
@@ -212,7 +214,7 @@ func (j *Joust) DeleteToken(w http.ResponseWriter, token *jwt.Token) {
 
 	// Remove invalid tokens from storage
 	go func() {
-		claims := token.Claims.(*StandardWithXSRFClaims)
+		claims := token.Claims.(*StandardClaims)
 		j.Options.Storer.Remove(claims.Id, j.EncodeToken(token))
 	}()
 }
@@ -249,6 +251,7 @@ func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Toke
 
 	// Decode and parse the token
 	parsedToken, err := j.DecodeToken(token)
+
 	// If an error occurs, call the error handler and return an error
 	if err != nil {
 		j.Options.ErrorHandler(w, r, err.Error())
@@ -273,7 +276,7 @@ func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Toke
 		return nil, fmt.Errorf("Error validating token algorithm: %s", message)
 	}
 
-	claims := parsedToken.Claims.(*StandardWithXSRFClaims)
+	claims := parsedToken.Claims.(*StandardClaims)
 
 	// Check if the parsed token is valid...
 	if !parsedToken.Valid || !j.Options.Storer.Exists(claims.Id, token) {
