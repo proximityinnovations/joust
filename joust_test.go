@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bmartel/joust"
+	"github.com/proximityinnovations/joust"
 )
 
 type MockStorage struct{}
