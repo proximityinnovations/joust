@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/proximityinnovations/joust"
 )
 
@@ -49,6 +50,10 @@ type CustomClaims struct {
 	Roles []string `json:"roles,omitempty"`
 }
 
+func convertToEmptyInterface(token *jwt.Token) interface{} {
+	return token
+}
+
 var auth = joust.New(&joust.Options{
 	Storer:          new(MockStorage),
 	SigningKey:      []byte("secret"),
@@ -83,6 +88,16 @@ func TestGenerateToken(t *testing.T) {
 }
 
 func TestGenerateTokenCustomClaims(t *testing.T) {
+	var customAuth = joust.New(&joust.Options{
+		Claims:          new(CustomClaims),
+		Storer:          new(MockStorage),
+		SigningKey:      []byte("secret"),
+		Domain:          "localhost",
+		TokenIdentifier: "id",
+		Secure:          false,
+		Debug:           true,
+		ErrorHandler:    func(w http.ResponseWriter, r *http.Request, err string) {},
+	})
 	r := new(http.Request)
 	r.URL = new(url.URL)
 
@@ -93,7 +108,7 @@ func TestGenerateTokenCustomClaims(t *testing.T) {
 		Roles: []string{"manager", "editor"},
 	}
 
-	token := auth.GenerateToken(r, customClaims, MockUser{}, false)
+	token := customAuth.GenerateToken(r, customClaims, MockUser{}, false)
 	tokenClaims := token.Claims.(*CustomClaims)
 
 	if tokenClaims.NotBefore != nowUnix {

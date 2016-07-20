@@ -32,6 +32,9 @@ type Options struct {
 	// Key used for encryption and hash generation
 	// *Required
 	SigningKey []byte
+	// Claims to be en/decoded
+	// Default value: &StandardClaims{}
+	Claims Claims
 	// The function that will return the Key to validate the JWT.
 	// It can be either a shared secret or a public key.
 	// Default value: nil
@@ -88,6 +91,10 @@ func New(options *Options) *Joust {
 
 	if options.SigningKey == nil {
 		panic("No signing key was provided")
+	}
+
+	if options.Claims == nil {
+		options.Claims = new(StandardClaims)
 	}
 
 	if options.ValidationKeyGetter == nil {
@@ -174,7 +181,7 @@ func (j *Joust) EncodeToken(token *jwt.Token) string {
 
 // DecodeToken will take a base64 encoded string and try to parse a jwt from it
 func (j *Joust) DecodeToken(token string) (*jwt.Token, error) {
-	return jwt.ParseWithClaims(token, &StandardClaims{}, j.Options.ValidationKeyGetter)
+	return jwt.ParseWithClaims(token, j.Options.Claims, j.Options.ValidationKeyGetter)
 }
 
 // StoreToken will store the token in a cookie and return the signed token string
