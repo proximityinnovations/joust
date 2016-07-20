@@ -194,8 +194,8 @@ func (j *Joust) StoreToken(w http.ResponseWriter, token *jwt.Token) string {
 	http.SetCookie(w, cookie)
 
 	go func() {
-		claims := token.Claims.(StandardClaims)
-		j.Options.Storer.Add(claims.Id, tokenEncoded)
+		claims := token.Claims.(Claims)
+		j.Options.Storer.Add(claims.GetID(), tokenEncoded)
 	}()
 
 	return tokenEncoded
@@ -214,8 +214,8 @@ func (j *Joust) DeleteToken(w http.ResponseWriter, token *jwt.Token) {
 
 	// Remove invalid tokens from storage
 	go func() {
-		claims := token.Claims.(*StandardClaims)
-		j.Options.Storer.Remove(claims.Id, j.EncodeToken(token))
+		claims := token.Claims.(Claims)
+		j.Options.Storer.Remove(claims.GetID(), j.EncodeToken(token))
 	}()
 }
 
@@ -276,14 +276,14 @@ func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Toke
 		return nil, fmt.Errorf("Error validating token algorithm: %s", message)
 	}
 
-	claims := parsedToken.Claims.(*StandardClaims)
+	claims := parsedToken.Claims.(Claims)
 
 	// Check if the parsed token is valid...
-	if !parsedToken.Valid || !j.Options.Storer.Exists(claims.Id, token) {
+	if !parsedToken.Valid || !j.Options.Storer.Exists(claims.GetID(), token) {
 		// Delete the invalid token
 		j.DeleteToken(w, parsedToken)
 
-		j.logf("Token is invalid, removing token with jti %s", claims.Id)
+		j.logf("Token is invalid, removing token with jti %s", claims.GetID())
 		j.Options.ErrorHandler(w, r, "The token isn't valid")
 		return nil, fmt.Errorf("Token is invalid")
 	}
