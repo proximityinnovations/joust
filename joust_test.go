@@ -33,6 +33,17 @@ func (MockUser) Identity() string {
 	return "123456"
 }
 
+type MockWriter struct{}
+
+func (m *MockWriter) Header() http.Header {
+	return make(http.Header)
+}
+func (m *MockWriter) Write(b []byte) (int, error) {
+	return 0, nil
+}
+func (m *MockWriter) WriteHeader(i int) {
+}
+
 type CustomClaims struct {
 	joust.StandardClaims
 	Roles []string `json:"roles,omitempty"`
@@ -83,7 +94,6 @@ func TestGenerateTokenCustomClaims(t *testing.T) {
 	}
 
 	token := auth.GenerateToken(r, customClaims, MockUser{}, false)
-
 	tokenClaims := token.Claims.(*CustomClaims)
 
 	if tokenClaims.NotBefore != nowUnix {
@@ -100,4 +110,21 @@ func TestGenerateTokenCustomClaims(t *testing.T) {
 	}
 
 	t.Logf("%+v", tokenClaims)
+}
+
+func TestStoreToken(t *testing.T) {
+	r := new(http.Request)
+	r.URL = new(url.URL)
+
+	customClaims := &CustomClaims{
+		Roles: []string{"manager", "editor"},
+	}
+
+	token := auth.GenerateToken(r, customClaims, MockUser{}, false)
+	mockWriter := &MockWriter{}
+	tokenEncoded := auth.StoreToken(mockWriter, token)
+
+	if tokenEncoded == "" {
+		t.Error("Token encoded was nil")
+	}
 }
