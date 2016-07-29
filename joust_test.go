@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/proximityinnovations/joust"
+	"github.com/bmartel/joust"
 )
 
 type MockStorage struct{}
