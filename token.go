@@ -12,6 +12,10 @@ type StandardClaims struct {
 	jwt.StandardClaims
 }
 
+func (c *StandardClaims) GetID() string {
+	return c.Id
+}
+
 func (c *StandardClaims) SetIdentity(user Identifier) {
 	c.Id = user.Identity()
 }
@@ -46,6 +50,7 @@ func (c *StandardClaims) SetExpiresAt(expiresAt int64) {
 
 type Claims interface {
 	jwt.Claims
+	GetID() string
 	SetIdentity(Identifier)
 	SetSubject(string)
 	GetSubject() string
