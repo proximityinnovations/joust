@@ -24,6 +24,10 @@ func FromHeader(r *http.Request) (string, error) {
 		return "", fmt.Errorf("Authorization header format must be Bearer {token}")
 	}
 
+	if len(strings.Split(authHeader, " ")) != 2 {
+		return "", fmt.Errorf("Authorization header format must be Bearer {token}")
+	}
+
 	return authHeader[7:], nil
 }
 
