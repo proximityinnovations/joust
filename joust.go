@@ -200,10 +200,8 @@ func (j *Joust) StoreToken(w http.ResponseWriter, token *jwt.Token) string {
 
 	http.SetCookie(w, cookie)
 
-	go func() {
-		claims := token.Claims.(Claims)
-		j.Options.Storer.Add(claims.GetID(), tokenEncoded)
-	}()
+	claims := token.Claims.(Claims)
+	j.Options.Storer.Add(claims.GetID(), tokenEncoded)
 
 	return tokenEncoded
 }
@@ -220,10 +218,8 @@ func (j *Joust) DeleteToken(w http.ResponseWriter, token *jwt.Token) {
 	http.SetCookie(w, cookie)
 
 	// Remove invalid tokens from storage
-	go func() {
-		claims := token.Claims.(Claims)
-		j.Options.Storer.Remove(claims.GetID(), j.EncodeToken(token))
-	}()
+	claims := token.Claims.(Claims)
+	j.Options.Storer.Remove(claims.GetID(), j.EncodeToken(token))
 }
 
 // ValidateToken parses and handles token validation for a given request
