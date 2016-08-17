@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bmartel/joust"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/proximityinnovations/joust"
 )
 
 type MockStorage struct{}
