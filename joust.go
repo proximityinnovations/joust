@@ -29,6 +29,9 @@ type Options struct {
 	// An implementation of the TokenStorer interface that manages tokens on the server
 	// *Required
 	Storer TokenStorer
+
+	TokenExists func(claims Claims, token string) bool
+
 	// Key used for encryption and hash generation
 	// *Required
 	SigningKey []byte
@@ -91,6 +94,12 @@ func New(options *Options) *Joust {
 
 	if options.SigningKey == nil {
 		panic("No signing key was provided")
+	}
+
+	if options.TokenExists == nil {
+		options.TokenExists = func(claims Claims, token string) bool {
+			return options.Storer.Exists(claims.GetID(), token)
+		}
 	}
 
 	if options.Claims == nil {
@@ -282,7 +291,7 @@ func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Toke
 	claims := parsedToken.Claims.(Claims)
 
 	// Check if the parsed token is valid...
-	if !parsedToken.Valid || !j.Options.Storer.Exists(claims.GetID(), token) {
+	if !parsedToken.Valid || !j.checkExistence(claims, token) {
 		// Delete the invalid token
 		j.DeleteToken(w, parsedToken)
 
@@ -294,6 +303,10 @@ func (j *Joust) ValidateToken(w http.ResponseWriter, r *http.Request) (*jwt.Toke
 	j.logf("JWT: %v", parsedToken)
 
 	return parsedToken, nil
+}
+
+func (j *Joust) checkExistence(claims Claims, token string) bool {
+	return j.Options.TokenExists(claims, token)
 }
 
 func (j *Joust) logf(format string, args ...interface{}) {
